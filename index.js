@@ -28,11 +28,8 @@ app.get('/', (req, res) => res.send('Hello World!'))
 //指定した番組の再生を行う。
 app.get('/play', function(req, res) {
   
-  //console.log(req.query.date)
-  //console.log(req.query.jikan)
   
   var datehani = datediff(req.query.date) //日付形式変換 (例)2020-04-06 -> 0406
-  //console.log(datehani)
 
   //日付もしくは時間が空欄の場合、エラーを返す
   if (req.query.date=='' || req.query.jikan=='' ){
@@ -79,13 +76,7 @@ app.get('/play', function(req, res) {
 
     //アプリのstatusをテキストファイルから読み込む
     let status_r=fs.readFileSync(STATEPATH,'utf-8')
-    //console.log("status_r")
-    //console.log(status_r)
-
-    //pythonコード実施後にpythonからjsにデータが引き渡される。
-    //pythonに引き渡されるデータは「data」に格納される。
     
-  // try{
     pyshell.on('message',  function (data) {
  
         res.send({
@@ -96,15 +87,6 @@ app.get('/play', function(req, res) {
            
       })
       })
-    // }catch(e){
-    //     res.send({
-    //       message:          
-    //      {
-    //         "mes":"スクレイピングエラー",
-    //       }             
-    //   })
-    // }
-
 
   }
 })
@@ -136,7 +118,7 @@ app.get('/endforce', function(req, res) {
 
 
 
-
+//番組再生を停止する。
 app.get('/end', function(req, res) {
 
   var {PythonShell} = require('python-shell');
@@ -144,10 +126,7 @@ app.get('/end', function(req, res) {
   
 
   pyshell.send(""); //jsからpythonコードstockgetall.pyを呼び出す。
-  //console.log("end")
-    //pythonコード実施後にpythonからjsにデータが引き渡される。
-    //pythonに引き渡されるデータは「data」に格納される。
-  //console.log("end1")
+
   pyshell.on('message',  function (data) {
  
       res.send({
@@ -163,20 +142,16 @@ app.get('/end', function(req, res) {
 
 
 
-
+//フロントエンドから送られてきた日付を分解して月と日付のみを取り出している
 var dateconv=function(predat) {
   var arrayOfStrings = predat.split("-");
   var month=arrayOfStrings[1]
   var hinichi=arrayOfStrings[2]
   var postdateform=month + hinichi
-  console.log('形式変換後');
-  console.log(postdateform);
-   //console.log('区切り: "' + separator + '"');
-   //console.log("配列は " + arrayOfStrings.length + " 要素: ");
   return postdateform;
 }
 
-
+//2つの日付の差分を求める
 var datediff=function (predat) {
   var d1 = new Date(predat);
   var today = new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate(),9,0,0);  //本日の日付を取得している。
