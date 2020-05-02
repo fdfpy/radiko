@@ -17,15 +17,11 @@
         <p><input type="button" v-if="!timerOn" value="START" class="btn-gradient-radius" @click="start()"></p>
         <p><input type="button" v-if="timerOn" value="STOP" class="btn-gradient-radius" @click="stop()"></p>
         <p><input type="button" value="RESRT" class="btn-gradient-radius" @click="reset()"></p>
-  
-
 
   </div>
 
                        
 </template>
-
-
 
 
 <script>
@@ -85,17 +81,11 @@ export default {
     },
 
 
-    //complete: function() {
-      //clearInterval(this.timerObj)
-    //},
-
-
-
     //ラジオ日経第2の指定された時間の番組にアクセスする
     getplay:function(){
         this.reset() //カウンターをリセットする
         this.result= "Music Playing..."
-　　　　this.start()
+        this.start()
         //再生したい番組の日にちと時間のデータをバックエンドに転送する。
         this.$axios.get('http://192.168.3.6:5000/play',
         
@@ -130,12 +120,8 @@ export default {
         this.result= "connecting..."
         this.$axios.get('http://192.168.3.6:5000/end')
           .then(function(response){
-            //console.log("check")
-            //console.log(response)
+
             this.result= response.data.message.mes  
-            console.log("AAAA")
-            this.sleep(5000)   
-            console.log("BBBB")    
             //location.reload();
             }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
           .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
@@ -166,42 +152,25 @@ export default {
             }.bind(this))
           .finally(function(){
 
-             
             }.bind(this))
           
     },
 
-
-
-
-  　sleep: function(ms) {
+    sleep: function(ms) {
       new Promise(r => setTimeout(r,ms))
     },
 
-
-    
-
-    // dateconv:function (predat) {
-    //    var d1 = new Date(predat);
-    //    var today = new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate(),9,0,0);
-    //    var msDiff = d1.getTime() - today.getTime();
-    //    var daysDiff = msDiff / (1000 * 60 * 60 *24);
-    //    return daysDiff
-    // },
 
     //ひとつ前のページに戻る
     returnButtonClick: function () {
         this.$router.go(-1) // 1つ戻る
     },
-
-
-  
-  },
-
-  created:function(){
-        ///
-  },
  
+  },
+
+
+ 
+  //タイマー表記 時間:分:秒を常時2桁表記するためのコード
   computed: {
      formatTime: function() {
         let timeStrings = [this.hour.toString(),this.min.toString(),this.sec.toString()].map(function(str) {
@@ -235,11 +204,6 @@ export default {
 }  
 
 </script>
-
-
-
-
-
 
 
 <style>
