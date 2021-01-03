@@ -1,0 +1,5 @@
+CSVPATH=r'/home/pi/dcshare/radiko/radiko.csv'
+TXTPATH=r'/home/pi/dcshare/radiko/radiko.txt'
+VOL50PATH=r'/home/pi/dcshare/radiko/vol50.sh'
+VOL60PATH=r'/home/pi/dcshare/radiko/vol60.sh'
+VOL70PATH=r'/home/pi/dcshare/radiko/vol70.sh'
