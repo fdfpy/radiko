@@ -16,4 +16,7 @@ import json
 os.system('pgrep Xvfb  | xargs kill -9') #Webスクレイピング実行時の仮想Dispay Xvfbを停止する。
 os.system('pgrep chromedriver  | xargs kill -9') #chromedriverのProcessを停止する。
 os.system('pgrep chromium-browse | xargs kill -9') #chromeのProcessを停止する。
+
+
+
 print("FORCEDONE")

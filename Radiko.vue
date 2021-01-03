@@ -3,12 +3,16 @@
   <div class="page">
         <h1>Radiko再生アプリ</h1>
           <h4>  <font size="6"> 状態 : {{ $data.result }}    残り時間{{ formatTime }}</font> </h4>
-        <p>ラジオ番組日付<input type="date" id="date" v-model="date">  </p>
-        <p>ラジオ番組時間 <v-select name="jikan" :options="options" v-model="jikan" ></v-select></p>　         　　　 
-        <p><input type="button" value="ラジオ番組再生" class="btn-gradient-radius" @click="getplay()"></p>
+        <p>ラジオ番組日付<input type="date" id="date" v-model="date">       連続再生 <input type="checkbox" id="continue"  v-model="conti"> </p> 
+        <p>ラジオ番組時間 <v-select name="jikan" :options="options"  v-if="!todayf"  v-model="jikan" ></v-select></p>
+        <p v-if="todayf"> Live broadcasting </p>
+        <p>放送局指定 <v-select name="brod" :options="brodall"  v-if="todayf" v-model="brod" ></v-select></p>　         　　　 
+        <p><input type="button" value="ラジオ番組再生" class="btn-gradient-radius" @click="proc()"></p>
         <p><input type="button" value="ラジオ番組停止" class="btn-gradient-radius" @click="end()"></p>
-        <p><input type="button" value="強制終了" class="btn-gradient-radius" @click="endforce()"></p>
-          <!--  {{$data}} --> 
+        <p><input type="button" value="入力モードに戻る" class="btn-gradient-radius" @click="repair()"></p>        
+        <p><input type="button" value="強制終了 or Reload" class="btn-gradient-radius" @click="endforce()"></p>
+
+           {{$data}}  
 
         <p><input type="button" value="戻る" class="btn-gradient-radius"　@click="returnButtonClick()"></p>
 
@@ -30,6 +34,7 @@
 import Vue from 'vue'
 import vSelect from 'vue-select' //ライブラリvue-selectを使用する。機能が追加された選択BOX
 import 'vue-select/dist/vue-select.css'
+const consts = require('./constrdk')
 
 Vue.component('v-select', vSelect)  
 
@@ -38,109 +43,232 @@ export default {
 
   name: 'radiko',
 
+
   methods:{
 
-    //タイマー：カウントダウンを行う。
-    count: function() {
+    //*************************************************************/
+    //(1) タイマー：カウントダウンを行う。連続再生モードでは、指定時間になれば次の番組を再生する。
+    //***********************************************************/
+    count:  function() {
 
       if (this.hour==1 && this.sec==0 && this.min==0){
         this.hour=0
         this.min=59
         this.sec=59
-      }else if(this.hour==0 && this.sec <= 0 && this.min >= 1){
+       }
+       //設定時間が"1900","1930","2130" &「タイムフリー連続再生」設定
+      else if( (this.jikan=="1900" ||  this.jikan=="1930"  || this.jikan=="2130") && this.conti==1 &&  this.hour==0 && this.sec == 40 && this.min == 29){
+        this.cnt++
+        this.end()
+       }
+         //設定時間が"2115" & 「タイムフリー連続再生」設定     
+      else if( (this.jikan=="2115") && this.conti==1 &&  this.hour==0 && this.sec == 20 && this.min == 44){
+        this.cnt++
+        this.end()
+       }
+         //設定時間がRadiko RN2放送時間 & 「タイムフリー連続再生」設定    
+      else if( !(this.jikan=="1900" ||  this.jikan=="1930"  || this.jikan=="2130" || this.jikan=="2115") && this.conti==1 &&  this.hour==0 && this.sec == 1 && this.min == 0){
+        this.cnt++
+        this.end()
+       }
+       　//1secごとにカウントダウンを行う。
+      else if(this.hour==0 && this.sec <= 0 && this.min >= 1){
         this.min --;
-        this.sec = 59;
-      }else if(this.hour==0 && this.sec <= 0 && this.min <= 0){
+        this.sec = 59;}
+
+        //0:00:00になればカウントダインを止める。
+      else if(this.hour==0 && this.sec <= 0 && this.min <= 0){
         this.complete();
-      }else{
+       }
+      else{
         this.sec  --
       }
 
-    },
+     },
 
 
-
-    //タイマー：カウントダウンを開始する。
+     //(1-2) タイマー：カウントダウンを開始する。
     start: function() {
       let self = this;
+      this.timerOn = true; //timerがONであることを状態として保持
       this.timerObj = setInterval(function() {self.count()}, 1000)
-      this.timerOn = true; //timerがOFFであることを状態として保持
-    },
+     },
 
-    //タイマー：タイマーをストップする。
+     //(1-3)タイマー：タイマーをストップする。
     stop: function() {
-      //clearInterval(this.timerObj);
+      clearInterval(this.timerObj);
       this.timerOn = false; //timerがOFFであることを状態として保持
     },
 
-    //タイマー：タイマーをリセットする。
+     //(1-4)タイマー：タイマーをリセットする。
     reset:function(){
       this.hour=1
       this.min=0
       this.sec=24
-    },
+      this.timerOn = false
+     },
 
 
-    //ラジオ日経第2の指定された時間の番組にアクセスする
-    getplay:function(){
+
+    //*************************************************************/
+    //(2) proc:一連のメイン同動作を記述する
+    //***********************************************************/
+
+
+
+    proc: async function(){
+
+      //パラメータ入力モード(sta=99)の場合以下を実行する
+      if(this.sta==99){
+        await this.getplay() //
+
+        //タイムフリー連続再生モード設定 && sta=1(連続再生モード2週目以降)の場合     
+        if(this.conti===true && this.sta==1){
+          console.log("41")    
+          console.log(this.sta)
+
+            //再生する番組が本日になるまタイムフリー再生を継続する。           
+            while(this.conti===true && this.sta==1){       
+              console.log("42")        
+              console.log(this.sta)         
+            await this.getplay()
+            }
+
+          //this.result= this.err==0 ? "連続再生終了" : this.result
+          location.reload();
+
+         }
+
+         //タイムフリー単発再生の場合、再生終了後、Webページを再読み込みする。
+        else if(this.conti==false && this.sta==2){
+          location.reload()
+         }
+
+         //ライブ放送かつ、「ラジオ番組停止」ボタンをクリックした場合
+        else if(this.conti==false && this.sta==0){
+          this.result="LIVE放送停止中"
+         }
+
+       }
+
+       //パラメータ入力エラー状態で、初期化せずに「ラジオ番組」再生をクリックした場合、警告する。 
+      else if(this.sta==-1){
+         this.reset()
+         alert("エラー発生。「入力モードに戻る」をクリックし再度入力してください")      
+      }
+      
+      
+     },
+
+
+     //*************************************************************/
+     //(3) getplay:Radikoを再生する。(メインメソッド)
+     //***********************************************************/
+
+
+     //ラジオ日経第2の指定された時間の番組にアクセスする
+    getplay:async function(){
         this.reset() //カウンターをリセットする
         this.result= "Music Playing..."
         this.start()
+        this.saisei=true
         //再生したい番組の日にちと時間のデータをバックエンドに転送する。
-        this.$axios.get('http://192.168.3.6:5000/play',
+        await this.$axios.get('http://' + consts.url +'/play',
         
           {params:
                 {
                   date:this.date,
-                  jikan:this.jikan
+                  jikan:this.jikan,
+                  brod:this.brod,
+                  conti:this.conti,
+                  todayf:this.todayf,
+                  sta:this.sta
+                  //re:this.sta
                 }          
           })
           .then(function(response){
-
+            console.log("バックエンドが正常終了した")
+            console.log(response.data.message)
             this.result= response.data.message.mes
-        
-          }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
-          .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
+            this.sta=response.data.message.sta
+            //this.err=response.data.message.err
 
-             //番組再生中はradiko.pyは動いているのでバックエンドからフロントエンドに何もデータが戻らないので、正常処理しているにも関わらずerrorが発生する
-             //よって、バックエンドから何もデータが返らない場合は正常動作しているので状態をMusic Playingを保持する
-            this.result=this.hour==1 ? "サーバーエラー発生" : "Music Playing..."  
-              
+            //入力パラメータ不備がバックエンドから返された場合
+            if (this.sta==-1){
+              this.stop()
+              this.reset()
+              }
+            
+           }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
+          .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
+            console.log("#1")
+            this.result= "Music Playing..."  
             }.bind(this))
           .finally(function(){
-  
+            console.log("#2")
             }.bind(this))
-    },
+     },
 
-    //再生をストップする
-    end: function () {
+
+     //*************************************************************/
+     //(4) end():再生をストップする処理を行う。
+     //***********************************************************/
+
+
+
+     //再生をストップする
+    end: async function () {
 
         this.stop()
         this.reset()
-        this.result= "connecting..."
-        this.$axios.get('http://192.168.3.6:5000/end')
-          .then(function(response){
 
-            this.result= response.data.message.mes  
-            //location.reload();
-            }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
-          .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
-            this.result="サーバーエラー発生1"
-            }.bind(this))
-          .finally(function(){
+         //getplay()実施前に「ラジオ番組停止」をクリックした場合、処理を止める
+        if( this.saisei===false ) {
+          this.result= "無効操作。「入力モードに戻る」をクリックしてください"
+        }
+         //正規の処理を実施する。
+        else{ 
+          this.result= "connecting..."
+          await this.$axios.get('http://' + consts.url +'/end')
+            .then(function(response){
+                console.log("END1")
+                this.sta=response.data.message.sta
+                console.log(this.sta)
+              if(this.sta==1){
+                //タイムフリー連続再生
+                this.result= "連続再生" + response.data.message.date + "再生中"
+                }
+              else if(this.sta==0){
+                  this.result= "ライブ放送停止中"           
+                }
+              else if(this.sta==2){
+                this.result= "タイムフリー単発停止中"           
+                }
 
-             
-            }.bind(this))
-          
-    },
+              //location.reload();
+              }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
+            .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
+              this.result="サーバーエラー発生1"
+                  console.log("END2")
+              }.bind(this))
+            .finally(function(){
+                    console.log("END3")            
 
-    //Xvfb,chromedriver,chromium-browseのプロセスの強制終了を行う。
+              }.bind(this))
+                console.log("END FINISH")  
+        }
+     },
+
+     //*************************************************************/
+     //(5) endforce():Xvfb,chromedriver,chromium-browseのプロセスの強制終了を行い、Webページをreloadする。
+     //***********************************************************/
+
     endforce: function () {
 
         this.stop()
         this.reset()
         this.result= "connecting..."
-        this.$axios.get('http://192.168.3.6:5000/endforce')
+        this.$axios.get('http://' + consts.url +'/endforce')
           .then(function(response){
 
             this.result= response.data.message.mes  
@@ -151,26 +279,119 @@ export default {
             this.result="サーバーエラー発生2"
             }.bind(this))
           .finally(function(){
-
+           location.reload();
             }.bind(this))
           
-    },
-
-    sleep: function(ms) {
-      new Promise(r => setTimeout(r,ms))
-    },
+     },
 
 
-    //ひとつ前のページに戻る
+
+     //*************************************************************/
+     //(6) repair：エラー発生時,sta=-1となるので,パラメータ入力待機状態(sta=99)に戻す。
+     //***********************************************************/
+
+    repair: function(){
+      this.sta=99
+      this.result='Ready'
+     },
+
+
+     //音量を50%設定にする
+    vol50: function () {
+
+
+        this.$axios.get('http://' + consts.url +'/vol50')
+          .then(function(response){
+
+
+
+            //location.reload();
+            }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
+          .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
+            this.result="サーバーエラー発生1"
+            }.bind(this))
+          .finally(function(){
+            //連続再生モードかつ手動で「ラジオ番組停止」をクリックした場合、RELOADを行う
+
+            }.bind(this))
+        console.log("VOL50")  
+      },
+
+     //音量を60%設定にする
+    vol60: function () {
+
+
+        this.$axios.get('http://' + consts.url +'/vol60')
+          .then(function(response){
+
+
+
+            //location.reload();
+            }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
+          .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
+            this.result="サーバーエラー発生1"
+            }.bind(this))
+          .finally(function(){
+            //連続再生モードかつ手動で「ラジオ番組停止」をクリックした場合、RELOADを行う
+
+            }.bind(this))
+        console.log("VOL60")  
+     },
+
+
+     //音量を70%設定にする
+    vol70: function () {
+
+
+        this.$axios.get('http://' + consts.url +'/vol70')
+          .then(function(response){
+
+
+
+            //location.reload();
+            }.bind(this))  //Promise処理を行う場合は.bind(this)が必要
+          .catch(function(error){  //バックエンドからエラーが返却された場合に行う処理について
+            this.result="サーバーエラー発生1"
+            }.bind(this))
+          .finally(function(){
+            //連続再生モードかつ手動で「ラジオ番組停止」をクリックした場合、RELOADを行う
+
+            }.bind(this))
+        console.log("VOL70")  
+     },
+
+
+
+     //ひとつ前のページに戻る
     returnButtonClick: function () {
         this.$router.go(-1) // 1つ戻る
     },
  
-  },
+   },
+
+
+
+
+
+   //「ラジオ番組日付」Boxに入力される値を監視する。値に変化があれば、日付が本日か、それとも本日ではないかを判定する関数
+  watch: {
+    //指定日と本日との日付け差分を計算する。
+      'date': function (val) {
+      var d1 = new Date(val); //日付predatを日付型に変更する。
+      var today = new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate(),0,0,0);  //本日の日付を取得している。
+      //console.log(today)
+      var msDiff = d1.getTime() - today.getTime();
+      var daysDiff = msDiff / (1000 * 60 * 60 *24);
+      console.log("daysDiff")      
+      console.log(daysDiff)
+      this.todayf=(daysDiff>-0.375 && daysDiff<0.625 ? true :false);
+     },
+   },
+
 
 
  
-  //タイマー表記 時間:分:秒を常時2桁表記するためのコード
+   //タイマー表記 時間:分:秒を常時2桁表記するためのコード
   computed: {
      formatTime: function() {
         let timeStrings = [this.hour.toString(),this.min.toString(),this.sec.toString()].map(function(str) {
@@ -181,28 +402,32 @@ export default {
         }
       })
       return timeStrings[0] + ":" + timeStrings[1] +":" + timeStrings[2]
-    }
-  },
+     }
+   },
 
 
   data: function(){
     return { 
-        result :'Ready',  //状態を格納する変数
-        date:'', //番組の日付
-        jikan:'', //番組の時間
-        options: ['0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900','2115','2130'], //選択BOX 「Vue-select」で選択できる番組の時間
-        hour: 1,
-        min: 0,
-        sec: 24,
-        timerOn: false,
-        timerObj: null,
-
+      result :'Ready',  //状態を格納する変数
+      date:'', //番組の日付
+      jikan:'', //番組の時間
+      options: ['0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900','1930','2115','2130'], //選択BOX 「Vue-select」で選択できる番組の時間
+      hour: 1,
+      min: 0,
+      sec: 24,
+      timerOn: false,
+      timerObj: null,
+      todayf:false, //指定した日付が本日か否か？
+      brodall:['FMT','RN1','RN2'], //選択BOX 「Vue-select」で選択できる放送局
+      brod:'', //放送局
+      conti:false, //連続再生するか？
+      sta:99,
+      cnt:0, //連続再生何回目かを記録する
+      saisei:false //「ラジオ番組再生」をクリック:true , 「ラジオ番組再生」クリック前:false
+        }  
 
     }
-  },
-
-}  
-
+}
 </script>
 
 
